@@ -14,7 +14,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const isProd = process.env.NODE_ENV === 'production';
 
-app.use(cors({ origin: true, credentials: true }));
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',')
+  : true;
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 // API Routes

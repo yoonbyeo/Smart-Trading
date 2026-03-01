@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: smart-trading
+    runtime: node
+    buildCommand: cd server && npm install && cd ../client && npm install && npm run build
+    startCommand: NODE_ENV=production node server/src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DB_PATH
+        value: /opt/render/project/data/analysis.db

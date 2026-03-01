@@ -1,3 +1,5 @@
+// VITE_API_URL: Render 백엔드 URL (예: https://smart-trading.onrender.com/api)
+// 비워두면 동일 서버 /api 로 요청 (로컬 및 단일 서버 배포 시)
 const API = import.meta.env.VITE_API_URL || '/api';
 
 function getToken() {
