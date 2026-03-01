@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { db } from '../db/index.js';
+import db from '../db/schema.js';
 import { getQuote } from '../services/yahooFinance.js';
 
 const router = Router();
@@ -28,7 +28,6 @@ router.get('/', async (req, res) => {
 
     const totalValue = enriched.reduce((s, h) => s + h.value, 0);
     const totalCost = enriched.reduce((s, h) => s + h.cost, 0);
-
     res.json({
       holdings: enriched,
       totalValue,
@@ -43,9 +42,7 @@ router.get('/', async (req, res) => {
 router.post('/', (req, res) => {
   try {
     const { symbol, quantity, avg_cost, purchased_at } = req.body;
-    if (!symbol || !quantity || !avg_cost) {
-      return res.status(400).json({ error: '종목, 수량, 매수가를 입력해주세요.' });
-    }
+    if (!symbol || !quantity || !avg_cost) return res.status(400).json({ error: '종목, 수량, 매수가를 입력해주세요.' });
     const result = db.prepare(`
       INSERT INTO portfolio_holdings (user_id, symbol, quantity, avg_cost, purchased_at)
       VALUES (?, ?, ?, ?, ?)
@@ -61,9 +58,15 @@ router.put('/:id', (req, res) => {
     const { id } = req.params;
     const { quantity, avg_cost } = req.body;
     db.prepare(`
-      UPDATE portfolio_holdings SET quantity = COALESCE(?, quantity), avg_cost = COALESCE(?, avg_cost)
+      UPDATE portfolio_holdings SET
+        quantity = COALESCE(?, quantity),
+        avg_cost = COALESCE(?, avg_cost)
       WHERE id = ? AND user_id = ?
-    `).run(quantity != null ? Number(quantity) : null, avg_cost != null ? Number(avg_cost) : null, id, req.userId);
+    `).run(
+      quantity != null ? Number(quantity) : null,
+      avg_cost != null ? Number(avg_cost) : null,
+      id, req.userId
+    );
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message || '수정 실패' });

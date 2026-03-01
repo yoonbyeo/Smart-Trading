@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth as authApi } from '../api/client';
+import { api } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -9,19 +9,16 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
+    if (token) {
+      api.get('/auth/me').then(setUser).catch(() => localStorage.removeItem('token')).finally(() => setLoading(false));
+    } else {
       setLoading(false);
-      return;
     }
-    authApi.me()
-      .then(setUser)
-      .catch(() => localStorage.removeItem('token'))
-      .finally(() => setLoading(false));
   }, []);
 
-  const login = (token, userData) => {
+  const login = ({ token, user }) => {
     localStorage.setItem('token', token);
-    setUser(userData);
+    setUser(user);
   };
 
   const logout = () => {
@@ -29,15 +26,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-}
+export const useAuth = () => useContext(AuthContext);

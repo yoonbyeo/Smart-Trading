@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import db from '../db/schema.js';
 import { analyzeStock } from '../services/analysisEngine.js';
+import { search } from '../services/yahooFinance.js';
 
 const router = Router();
 
-const SAMPLE_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', '005930.KS', '000660.KS', 'TSLA', 'NVDA', 'AMZN'];
+const SAMPLE_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'NVDA', 'AMZN', 'META', 'JPM', '005930.KS', '000660.KS'];
 
 router.get('/daily-analysis', async (req, res) => {
   try {
@@ -20,9 +21,12 @@ router.get('/daily-analysis', async (req, res) => {
       for (const symbol of SAMPLE_SYMBOLS) {
         try {
           const a = await analyzeStock(symbol);
-          if (a && a.strategies?.length > 0) {
+          if (a) {
             db.prepare(`
-              INSERT INTO daily_stocks (analysis_id, symbol, name, market, current_price, target_price, stop_loss, score, short_term_score, strategies, summary, pe_ratio, peg_ratio, roe, graham_number, chowder_number, rsi)
+              INSERT INTO daily_stocks
+              (analysis_id, symbol, name, market, current_price, target_price, stop_loss,
+               score, short_term_score, strategies, summary, pe_ratio, peg_ratio, roe,
+               graham_number, chowder_number, rsi)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               row.id, a.symbol, a.name, a.market, a.currentPrice, a.targetPrice, a.stopLoss,
@@ -52,13 +56,11 @@ router.get('/daily-analysis', async (req, res) => {
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q || q.length < 2) return res.json([]);
-
-    const { search } = await import('../services/yahooFinance.js');
+    if (!q || q.length < 1) return res.json([]);
     const results = await search(q);
     res.json(results.map(r => ({
       symbol: r.symbol,
-      name: r.shortname || r.longname || r.shortName || r.longName || r.symbol,
+      name: r.shortname || r.longname || r.symbol,
       exchange: r.exchange || ''
     })));
   } catch {

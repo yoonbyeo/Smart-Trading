@@ -1,191 +1,152 @@
 import { useState, useEffect } from 'react';
-import { portfolio as portfolioApi } from '../api/client';
+import { api } from '../api/client.js';
 
 export default function Portfolio() {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState({ holdings: [], totalValue: 0, totalCost: 0, totalReturnPct: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ symbol: '', quantity: '', avg_cost: '' });
+  const [form, setForm] = useState({ symbol: '', quantity: '', avg_cost: '', purchased_at: '' });
+  const [adding, setAdding] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
-  const load = () => {
-    portfolioApi.get()
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+  const fetchPortfolio = () => {
+    setLoading(true);
+    api.get('/portfolio').then(setData).catch(e => setError(e.message)).finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  useEffect(fetchPortfolio, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.symbol || !form.quantity || !form.avg_cost) return;
+    setAdding(true);
     try {
-      await portfolioApi.add(form.symbol, form.quantity, form.avg_cost);
-      setForm({ symbol: '', quantity: '', avg_cost: '' });
-      setAddOpen(false);
-      load();
-    } catch (err) {
-      setError(err.message);
+      await api.post('/portfolio', {
+        symbol: form.symbol.toUpperCase(),
+        quantity: Number(form.quantity),
+        avg_cost: Number(form.avg_cost),
+        purchased_at: form.purchased_at || null
+      });
+      setForm({ symbol: '', quantity: '', avg_cost: '', purchased_at: '' });
+      setShowForm(false);
+      fetchPortfolio();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setAdding(false);
     }
   };
 
-  const handleRemove = async (id) => {
+  const handleDelete = async (id) => {
     if (!confirm('삭제하시겠습니까?')) return;
     try {
-      await portfolioApi.remove(id);
-      load();
-    } catch (err) {
-      setError(err.message);
+      await api.delete(`/portfolio/${id}`);
+      fetchPortfolio();
+    } catch (e) {
+      setError(e.message);
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '3rem' }} className="text-muted">
-        포트폴리오 로딩 중...
-      </div>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <div className="card" style={{ color: 'var(--down)' }}>
-        {error}
-      </div>
-    );
-  }
-
-  const { holdings = [], totalValue = 0, totalCost = 0, totalReturnPct = 0 } = data || {};
+  if (loading) return <div className="loading"><div className="spinner" />로딩 중...</div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 style={{ fontSize: '1.5rem' }}>내 포트폴리오</h1>
-        <button onClick={() => setAddOpen(true)}>종목 추가</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>내 포트폴리오</h1>
+          <p style={{ color: 'var(--text2)' }}>보유 종목 현황 및 수익률</p>
+        </div>
+        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
+          {showForm ? '취소' : '+ 종목 추가'}
+        </button>
       </div>
 
-      {error && (
-        <div className="card mb-4" style={{ color: 'var(--down)' }}>{error}</div>
-      )}
+      {error && <div className="error-msg">{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div className="card">
-          <div className="text-muted text-sm">총 평가금액</div>
-          <div className="font-mono" style={{ fontSize: '1.25rem' }}>
-            ₩{totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-muted text-sm">총 투자원금</div>
-          <div className="font-mono" style={{ fontSize: '1.25rem' }}>
-            ₩{totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </div>
-        </div>
-        <div className="card">
-          <div className="text-muted text-sm">수익률</div>
-          <div className={`font-mono ${totalReturnPct >= 0 ? 'up' : 'down'}`} style={{ fontSize: '1.25rem' }}>
-            {totalReturnPct >= 0 ? '+' : ''}{totalReturnPct.toFixed(2)}%
-          </div>
-        </div>
-      </div>
-
-      {addOpen && (
-        <div className="card mb-4">
-          <h3 style={{ marginBottom: '1rem' }}>종목 추가</h3>
-          <form onSubmit={handleAdd} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      {showForm && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>종목 추가</h2>
+          <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
             <div>
-              <label className="text-sm" style={{ display: 'block', marginBottom: '0.25rem' }}>심볼</label>
-              <input
-                value={form.symbol}
-                onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                placeholder="AAPL"
-                required
-              />
+              <label style={{ display: 'block', marginBottom: 6, color: 'var(--text2)', fontSize: 13 }}>티커</label>
+              <input placeholder="AAPL" value={form.symbol} onChange={e => setForm(f => ({ ...f, symbol: e.target.value }))} required />
             </div>
             <div>
-              <label className="text-sm" style={{ display: 'block', marginBottom: '0.25rem' }}>수량</label>
-              <input
-                type="number"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                placeholder="10"
-                required
-                min="0.0001"
-                step="any"
-              />
+              <label style={{ display: 'block', marginBottom: 6, color: 'var(--text2)', fontSize: 13 }}>수량</label>
+              <input type="number" placeholder="10" step="any" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} required />
             </div>
             <div>
-              <label className="text-sm" style={{ display: 'block', marginBottom: '0.25rem' }}>매수가</label>
-              <input
-                type="number"
-                value={form.avg_cost}
-                onChange={(e) => setForm({ ...form, avg_cost: e.target.value })}
-                placeholder="150000"
-                required
-                min="0"
-                step="any"
-              />
+              <label style={{ display: 'block', marginBottom: 6, color: 'var(--text2)', fontSize: 13 }}>매수가</label>
+              <input type="number" placeholder="150.00" step="any" value={form.avg_cost} onChange={e => setForm(f => ({ ...f, avg_cost: e.target.value }))} required />
             </div>
-            <button type="submit">추가</button>
-            <button type="button" onClick={() => setAddOpen(false)} style={{ background: 'var(--bg-secondary)' }}>
-              취소
-            </button>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, color: 'var(--text2)', fontSize: 13 }}>매수일</label>
+              <input type="date" value={form.purchased_at} onChange={e => setForm(f => ({ ...f, purchased_at: e.target.value }))} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button type="submit" className="btn btn-primary" disabled={adding} style={{ width: '100%', justifyContent: 'center' }}>
+                {adding ? '추가 중...' : '추가'}
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      <div className="card">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              <th style={{ textAlign: 'left', padding: '0.75rem' }}>종목</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem' }}>수량</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem' }}>매수가</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem' }}>현재가</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem' }}>평가금액</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem' }}>수익률</th>
-              <th style={{ padding: '0.75rem' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {holdings.length === 0 ? (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+        {[
+          { label: '총 평가액', value: `$${data.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+          { label: '총 투자금', value: `$${data.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+          {
+            label: '총 수익률',
+            value: `${data.totalReturnPct >= 0 ? '+' : ''}${data.totalReturnPct.toFixed(2)}%`,
+            color: data.totalReturnPct >= 0 ? 'var(--green)' : 'var(--red)'
+          },
+          { label: '보유 종목', value: `${data.holdings.length}개` }
+        ].map(({ label, value, color }) => (
+          <div key={label} className="card" style={{ padding: '16px 20px' }}>
+            <div style={{ color: 'var(--text2)', fontSize: 12, marginBottom: 6 }}>{label}</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: color || 'var(--text)' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {data.holdings.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 60, color: 'var(--text2)' }}>
+          보유 종목이 없습니다. 종목을 추가해보세요.
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table>
+            <thead>
               <tr>
-                <td colSpan={7} style={{ padding: '2rem', textAlign: 'center' }} className="text-muted">
-                  보유 종목이 없습니다. 종목을 추가해보세요.
-                </td>
+                <th>종목</th>
+                <th>수량</th>
+                <th>매수가</th>
+                <th>현재가</th>
+                <th>평가액</th>
+                <th>수익률</th>
+                <th></th>
               </tr>
-            ) : (
-              holdings.map((h) => (
-                <tr key={h.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 500 }}>{h.symbol}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }} className="font-mono">{h.quantity}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }} className="font-mono">
-                    ₩{Number(h.avg_cost).toLocaleString()}
+            </thead>
+            <tbody>
+              {data.holdings.map(h => (
+                <tr key={h.id}>
+                  <td><strong>{h.symbol}</strong></td>
+                  <td>{h.quantity}</td>
+                  <td>${h.avg_cost?.toLocaleString()}</td>
+                  <td>${h.currentPrice?.toLocaleString()}</td>
+                  <td>${h.value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                  <td className={h.returnPct >= 0 ? 'positive' : 'negative'}>
+                    {h.returnPct >= 0 ? '+' : ''}{h.returnPct?.toFixed(2)}%
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }} className="font-mono">
-                    ₩{Number(h.currentPrice).toLocaleString()}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }} className="font-mono">
-                    ₩{Number(h.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }} className={`font-mono ${h.returnPct >= 0 ? 'up' : 'down'}`}>
-                    {h.returnPct >= 0 ? '+' : ''}{h.returnPct.toFixed(2)}%
-                  </td>
-                  <td style={{ padding: '0.75rem' }}>
-                    <button
-                      onClick={() => handleRemove(h.id)}
-                      style={{ background: 'var(--down)', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
-                    >
-                      삭제
-                    </button>
+                  <td>
+                    <button onClick={() => handleDelete(h.id)} className="btn btn-danger btn-sm">삭제</button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

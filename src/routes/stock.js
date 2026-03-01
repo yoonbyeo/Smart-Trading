@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getQuote, getHistorical, search, getQuoteSummary } from '../services/yahooFinance.js';
+import { getHistorical } from '../services/yahooFinance.js';
 import { analyzeStock, calcRSI } from '../services/analysisEngine.js';
 
 const router = Router();
@@ -38,14 +38,10 @@ router.get('/:symbol/technical', async (req, res) => {
   }
 });
 
-router.get('/:symbol/news', async (req, res) => {
-  try {
-    const baseSymbol = req.params.symbol.replace(/\.(KS|KQ)$/, '');
-    const url = `https://news.google.com/search?q=${encodeURIComponent(baseSymbol)}+stock&hl=ko`;
-    res.json({ url, articles: [] });
-  } catch {
-    res.json({ url: null, articles: [] });
-  }
+router.get('/:symbol/news', (req, res) => {
+  const baseSymbol = req.params.symbol.replace(/\.(KS|KQ)$/, '');
+  const url = `https://news.google.com/search?q=${encodeURIComponent(baseSymbol)}+stock&hl=ko`;
+  res.json({ url, articles: [] });
 });
 
 export default router;
