@@ -2,7 +2,7 @@ services:
   - type: web
     name: smart-trading
     runtime: node
-    buildCommand: cd server && npm install && cd ../client && npm install && npm run build
+    buildCommand: cd server && npm install --legacy-peer-deps && cd ../client && npm install --legacy-peer-deps && npm run build
     startCommand: NODE_ENV=production node server/src/index.js
     envVars:
       - key: NODE_ENV
