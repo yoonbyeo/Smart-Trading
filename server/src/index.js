@@ -29,14 +29,22 @@ app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 // Production: serve React build from client/dist
 if (isProd) {
-  const distPath = join(__dirname, '../../client/dist');
-  if (existsSync(distPath)) {
+  // server/src/index.js 기준으로 ../../client/dist 또는 루트 기준 client/dist
+  const candidates = [
+    join(__dirname, '../../client/dist'),
+    join(process.cwd(), 'client/dist')
+  ];
+  const distPath = candidates.find(existsSync);
+  if (distPath) {
+    console.log('Serving static files from:', distPath);
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       if (!req.path.startsWith('/api')) {
         res.sendFile(join(distPath, 'index.html'));
       }
     });
+  } else {
+    console.warn('client/dist not found. Run npm run build first.');
   }
 }
 
